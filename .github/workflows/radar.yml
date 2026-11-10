@@ -1,0 +1,48 @@
+# Va en el repositorio como:  .github/workflows/radar.yml
+name: Radar de llamados
+
+on:
+  schedule:
+    # Lunes a viernes 08:07 de Montevideo (11:07 UTC). GitHub puede demorarlo unos minutos.
+    - cron: "7 11 * * 1-5"
+  workflow_dispatch:   # permite correrlo a mano desde la pestaña Actions
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: radar
+  cancel-in-progress: false
+
+jobs:
+  radar:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    environment:
+      name: github-pages
+      url: ${{ steps.deploy.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      # Recupera lo ya leído en corridas anteriores, para leer solo lo nuevo.
+      - uses: actions/cache@v4
+        with:
+          path: cache_llamados.json
+          key: radar-cache-${{ github.run_id }}
+          restore-keys: radar-cache-
+
+      - name: Leer llamados y generar informe
+        run: python radar_llamados.py --salida site/index.html --cache cache_llamados.json --no-abrir
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: site
+
+      - id: deploy
+        uses: actions/deploy-pages@v4
